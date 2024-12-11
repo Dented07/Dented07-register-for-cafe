@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Register</title>
+    <style>
+        * {
+            -webkit-tap-highlight-color: transparent;
+            box-sizing: border-box;
+        }
+        
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            height: 100vh;
+            background: #f0f0f0;
+            touch-action: manipulation;
+        }
+
+        #display {
+            width: 100%;
+            height: 80px;
+            background: white;
+            border-radius: 10px;
+            font-size: 40px;
+            text-align: right;
+            padding: 15px;
+            margin-bottom: 20px;
+            border: 2px solid #ddd;
+        }
+
+        #keypad {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+
+        .key {
+            background: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 24px;
+            height: 70px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            touch-action: manipulation;
+        }
+
+        .key:active {
+            background: #eee;
+        }
+
+        #clear {
+            grid-column: 1 / -1;
+            background: #ff4444;
+            color: white;
+        }
+
+        #status {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 14px;
+        }
+
+        .connected {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .disconnected {
+            background: #ff4444;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div id="status" class="disconnected">Offline</div>
+    <div id="display">$0.00</div>
+    <div id="keypad">
+        <button class="key">7</button>
+        <button class="key">8</button>
+        <button class="key">9</button>
+        <button class="key">4</button>
+        <button class="key">5</button>
+        <button class="key">6</button>
+        <button class="key">1</button>
+        <button class="key">2</button>
+        <button class="key">3</button>
+        <button class="key">0</button>
+        <button class="key">.</button>
+        <button class="key">⌫</button>
+        <button class="key" id="clear">CLEAR</button>
+    </div>
+
+    <script>
+        let ws = null;
+        let amount = '0';
+        const display = document.getElementById('display');
+        const status = document.getElementById('status');
+        const keys = document.querySelectorAll('.key');
+
+        function updateDisplay() {
+            display.textContent = `$${parseFloat(amount || 0).toFixed(2)}`;
+        }
+
+        function connectWebSocket() {
+            try {
+                // Change this IP to your computer's IP address
+                ws = new WebSocket('ws://10.0.0.231:3000');
+
+                ws.onopen = () => {
+                    status.textContent = 'Connected';
+                    status.className = 'connected';
+                };
+
+                ws.onclose = () => {
+                    status.textContent = 'Offline';
+                    status.className = 'disconnected';
+                    setTimeout(connectWebSocket, 3000);
+                };
+
+                ws.onerror = () => {
+                    status.textContent = 'Error';
+                    status.className = 'disconnected';
+                };
+            } catch (error) {
+                console.error('WebSocket error:', error);
+            }
+        }
+
+        function sendUpdate() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'update',
+                    total: parseFloat(amount || 0)
+                }));
+            }
+        }
+
+        keys.forEach(key => {
+            key.addEventListener('click', () => {
+                const value = key.textContent;
+                
+                if (value === 'CLEAR') {
+                    amount = '0';
+                } else if (value === '⌫') {
+                    amount = amount.slice(0, -1) || '0';
+                } else if (value === '.' && !amount.includes('.')) {
+                    amount = amount + value;
+                } else if (value !== '.') {
+                    amount = amount === '0' ? value : amount + value;
+                }
+                
+                updateDisplay();
+                sendUpdate();
+            });
+        });
+
+        // Prevent zoom on double tap
+        document.addEventListener('dblclick', (e) => {
+            e.preventDefault();
+        });
+
+        // Connect on startup
+        connectWebSocket();
+    </script>
+</body>
+</html>
